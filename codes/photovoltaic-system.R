@@ -16,7 +16,7 @@
 #'           r = 0.20, 
 #'           H = 2500, 
 #'           PR = 0.75)
-#' 
+#' @author Jay Kim
 #' @export
 ps_energy <- function(A, r, H, PR) {
   
