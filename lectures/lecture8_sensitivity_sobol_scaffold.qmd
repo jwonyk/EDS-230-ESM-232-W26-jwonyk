@@ -54,7 +54,7 @@ Run the model for each sample
 
 Graph the results
 
-Quantify sensitivity - we used *pcc*
+Quantify sensitivity - we used *`pcc`*
 
 ------------------------------------------------------------------------
 
@@ -96,7 +96,7 @@ Several Indices
 
 -   The *Sensitivity* package has several of those
 
--   today we will use *sobolSalt* - which uses a method by Saltelli (who has written extensively on Sensitivity analysis)
+-   today we will use *`sobolSalt`* - which uses a method by Saltelli (who has written extensively on Sensitivity analysis)
 
 -   R help pages for *Sensitivity* provide many good references
 
@@ -104,7 +104,7 @@ Several Indices
 
 -   run Sobol to get parameter sets in a sensitivity analysis object
 -   run model with those parameter sets
--   *tell* the senstivity object about results associated with each parameter set
+-   *tell* the sensitivity object about results associated with each parameter set
 -   look at sensitivity analysis indices from Sobol
 
 Generation of parameter sets slightly different
@@ -115,36 +115,33 @@ Generation of parameter sets slightly different
 
 ## Example Atmospheric Conductance {.scrollable}
 
-Often when we are estimating vegetation or crop water use we need to know the atmospheric conductance - which is essentially how easily water diffuses into the air and depends largely on windspeed (you get more evaporation in windier conditions)
+Often when we are estimating vegetation or crop water use we need to know the atmospheric conductance - which is essentially how easily water diffuses into the air and depends largely on wind speed (you get more evaporation in windier conditions)
 
 Atmospheric conductance is also influenced by the vegetation itself and the turbulence it creates
 
 I've provided a function to compute atmospheric conductance $C_{at}$ (how easily vapor diffuses from vegetation surfaces)
 
-**The function *Catm.R* is provided**
+**The function *`Catm.R`* is provided**
 
 ## Atmospheric conductance (simple model) {.scrollable}
 
-So that you know what it does - here's some background on the function 
-$$
+So that you know what it does - here's some background on the function $$
 C_{at} = \frac{v_m}{6.25*{ln(\frac{z_m-z_d}{z_0})}^2}
-$$
-$$
+$$ $$
 z_d = k_d*h
-$$
-$$
+$$ $$
 z_0 = k_0*h
 $$
 
-$z_m$ is the height at which windspeed is measured - must be higher than the vegetation (cm), it is usually measured 200 cm above the vegetation
+$z_m$ is the height at which wind speed is measured - must be higher than the vegetation (cm), it is usually measured 200 cm above the vegetation
 
 $h$ is vegetation height (cm)
 
-$v$ is windspeed (cm/s)
+$v$ is wind speed (cm/s)
 
 Typical values if $k_d$ and $k_o$ are 0.7 and 0.1 respectively (so use those as defaults)
 
-## Sensitivity Anallysis Goal {.scrollable}
+## Sensitivity Analysis Goal {.scrollable}
 
 For a given forest, perform a sensitivity analysis of model predictions of conductance. Consider the sensitivity to uncertainty in the following parameters and inputs
 
@@ -156,7 +153,7 @@ For a given forest, perform a sensitivity analysis of model predictions of condu
 
 -   $v$
 
-Windspeeds $v$ are normally distributed with a mean of 250 cm/s with a standard deviation of 30 cm/s
+Wind speeds $v$ are normally distributed with a mean of 250 cm/s with a standard deviation of 30 cm/s
 
 For vegetation height assume that height is somewhere between 9.5 and 10.5 m (but any value in that range is equally likely)
 
@@ -186,7 +183,6 @@ First we need to generate parameter sets for the Sobol analysis
 -   2 sets of samples of all of the parameters, we will make these up by sampling from expected distributions
 -   use *sobolSalt* to generate the parameter sets
 
-
 ```{r sobolpar}
 source(here("R/Catm.R"))
 
@@ -194,16 +190,34 @@ source(here("R/Catm.R"))
 
 # generate two examples of random number from parameter distributions
 
+np <- 1000
+k_o <- rnorm(mean = 0.1, sd = 0.1 * 0.1, n = np)
+k_d <- rnorm(mean = 0.7, sd = 0.7 * 0.1, n = np)
+v <- rnorm(mean = 250, sd = 30, n = np)
+height = runif(min = 9.5, max = 10.5, n = np)
+
 # first set call it X1
+X1 = cbind.data.frame(k_o, k_d, v, height)
+
+np <- 1000
+k_o <- rnorm(mean = 0.1, sd = 0.1 * 0.1, n = np)
+k_d <- rnorm(mean = 0.7, sd = 0.7 * 0.1, n = np)
+v <- rnorm(mean = 250, sd = 30, n = np)
+height = runif(min = 9.5, max = 10.5, n = np)
 
 # repeat sampling and call it X2
+X2 = cbind.data.frame(k_o, k_d, v, height)
+
+np <- 1000
+k_o <- rnorm(mean = 0.1, sd = 0.1 * 0.1, n = np)
+k_d <- rnorm(mean = 0.7, sd = 0.7 * 0.1, n = np)
+v <- rnorm(mean = 250, sd = 30, n = np)
+height = runif(min = 9.5, max = 10.5, n = np)
 
 # there are different versions of sobol functions that have different approaches for estimating parameters and indices, we use an approach implemented by jansen
-
 # run sobolSalt function giving it X1 and X2 and save result
 
-sens_Catm_Sobol = 
-
+sens_Catm_Sobol = sobolSalt(model = NULL, X1, X2, nboot = 100)
 
 # Take a look at the Sobol generated sensitivity object
   
@@ -219,26 +233,30 @@ now run model for Sobol generated parameter sets and compute indices
 # so some formatting first 
 # turn into data frame 
 
-
 # give parameters names
 
+parms = as.data.frame(sens_Catm_Sobol$X)
+colnames(parms) = colnames(X1)
 
 # run the Catm model for all parmeter sets and save results
-#(use pmap_dbl from purrr)
-
+res = pmap_dbl(parms, Catm)
+# (use pmap_dbl from purrr)
 
 # now tell our orginal Sobol object about the results.   
 
+sens_Catm_Sobol = sensitivity::tell(sens_Catm_Sobol, res, res.names = "gs")
 # look at results
-# main effect (S):  partitions variance (main effect without co-variance) - sums approximately to one
+# main effect (S): partitions variance (main effect without co-variance) - sums approximately to one
+
+sens_Catm_Sobol$S
+row.names(sens_Catm_Sobol$S) = colnames(parms)
 
 # useful to add names (by row)
 
 # total effect (T) - accounts for parameter interactions
+row.names(sens_Catm_Sobol$T) = colnames(parms)
 
 # Both the main effect and total effect can tell us something about how the parameter influences results
-
-
 print(sens_Catm_Sobol)
 ```
 
@@ -258,13 +276,17 @@ TIP: a useful plotting strategy is to plot model output against parameter with t
 
 ```{r sobolplot}
 
-# first combine parameters and output  
+# first combine parameters and output
+both = cbind.data.frame(parms, gs = sens_Catm_Sobol$y)
 
 # look at overall gs sensitivity to all parameter variation
-
+ggplot(both, aes(x = gs)) +
+  geom_histogram()
 
 # look at response of conductance to the two most important variables choose 
 # second 'most important" as color
+ggplot(both, aes(k_o, gs, col = v)) +
+  geom_point()
 
 # use second most sensitive parameter (using most important as color)
 
